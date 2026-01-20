@@ -29,6 +29,8 @@ API_SERVER_HOST = os.environ.get("API_SERVER_HOST", "127.0.0.1")
 API_SERVER_URL_OVERRIDE_FOR_HTTP_REQUESTS = os.environ.get(
     "API_SERVER_URL_OVERRIDE_FOR_HTTP_REQUESTS"
 )
+# URL for the build webapp proxy endpoint
+BUILD_WEBAPP_URL = os.environ.get("BUILD_WEBAPP_URL", "")
 
 # Whether to send user metadata (user_id/email and session_id) to the LLM provider.
 # Disabled by default.
@@ -1027,3 +1029,14 @@ INSTANCE_TYPE = (
 ## Discord Bot Configuration
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
 DISCORD_BOT_INVOKE_CHAR = os.environ.get("DISCORD_BOT_INVOKE_CHAR", "!")
+# Persistent Document Storage Configuration
+# When enabled, indexed documents are written to local filesystem with hierarchical structure
+PERSISTENT_DOCUMENT_STORAGE_ENABLED = (
+    os.environ.get("PERSISTENT_DOCUMENT_STORAGE_ENABLED", "").lower() == "true"
+)
+
+# Base directory path for persistent document storage (local filesystem)
+# Example: /var/onyx/indexed-docs or /app/indexed-docs
+PERSISTENT_DOCUMENT_STORAGE_PATH = os.environ.get(
+    "PERSISTENT_DOCUMENT_STORAGE_PATH", "/app/indexed-docs"
+)

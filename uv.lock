@@ -39,6 +39,18 @@ wheels = [
 ]
 
 [[package]]
+name = "agent-client-protocol"
+version = "0.7.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/db/7c/12da39be4f73026fd9b02144df5f64d803488cf1439aa221b0edb7c305e3/agent_client_protocol-0.7.1.tar.gz", hash = "sha256:8d7031209e14c3f2f987e3b95e7d9c3286158e7b2af1bf43d6aae5b8a429249f", size = 66226, upload-time = "2025-12-28T13:58:57.012Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/03/48/48d2fb454f911147432cd779f548e188274e1700f1cbe0a258e78158331a/agent_client_protocol-0.7.1-py3-none-any.whl", hash = "sha256:4ffe999488f2b23db26f09becdfaa2aaae6529f0847a52bca61bc2c628001c0f", size = 53771, upload-time = "2025-12-28T13:58:55.967Z" },
+]
+
+[[package]]
 name = "aioboto3"
 version = "15.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -950,6 +962,22 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7e/b6/6cdc486fced92110a8166aa190b7d60435165119990fc2e187a56d15144b/classify_imports-4.2.0.tar.gz", hash = "sha256:7abfb7ea92149b29d046bd34573d247ba6e68cc28100c801eba4af17964fc40e", size = 5188, upload-time = "2022-07-31T22:59:12.139Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8b/a5/f752351ea2652744f711bf5d478f00e2ceeeff0def6316ea9e1bfa18d8d2/classify_imports-4.2.0-py2.py3-none-any.whl", hash = "sha256:dbbc264b70a470ed8c6c95976a11dfb8b7f63df44ed1af87328bbed2663f5161", size = 5403, upload-time = "2022-07-31T22:59:10.799Z" },
+]
+
+[[package]]
+name = "claude-agent-sdk"
+version = "0.1.19"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "mcp" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/60/b0/73c6f4e09439b4442aa6d5650eb7bf232322d939feb9f15711525fc74a0a/claude_agent_sdk-0.1.19.tar.gz", hash = "sha256:318c6dbd049bfdb101ed580aece47d63bea32b75a708c86d9e649735e524c736", size = 56163, upload-time = "2026-01-08T01:46:39.848Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0d/6d/268c90b53c112f0fb0ed5e8eb5a011be90c77dce13ea35ceb825fd8654eb/claude_agent_sdk-0.1.19-py3-none-macosx_11_0_arm64.whl", hash = "sha256:0d4ec526de19989dc1d62c3abdf9b71b785f8df851735ec14266fd14d341f34b", size = 53580971, upload-time = "2026-01-08T01:46:26.935Z" },
+    { url = "https://files.pythonhosted.org/packages/1a/30/e53cd5888a0e6efd952e1c16709125cab7e91e1468a7180e016844fa69f5/claude_agent_sdk-0.1.19-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:cff32c935d952b61cc421f9731ad9549df63e871710055446e8abdd4f1d4c5ea", size = 67797723, upload-time = "2026-01-08T01:46:29.854Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/f9/86ac9ef3b200fbeb020f6d1c03fb30a15ca97e9c96f0005be17001bcb37a/claude_agent_sdk-0.1.19-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:016d0127cf6ef9f5e36dd385bb3a808c9f4ba2a6ed80c676affe4f0801edd311", size = 69507781, upload-time = "2026-01-08T01:46:33.411Z" },
+    { url = "https://files.pythonhosted.org/packages/73/e0/f2547e461570d6a5a75e35447153fb932ea6b0ccba1a452f5717e2d12148/claude_agent_sdk-0.1.19-py3-none-win_amd64.whl", hash = "sha256:0b6d820599d1ecf8aad37cf65fcf42e7fd067b732325c4d85e07559584f4bafc", size = 71705389, upload-time = "2026-01-08T01:46:36.679Z" },
 ]
 
 [[package]]
@@ -4534,8 +4562,10 @@ name = "onyx"
 version = "0.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "agent-client-protocol" },
     { name = "aioboto3" },
     { name = "brotli" },
+    { name = "claude-agent-sdk" },
     { name = "cohere" },
     { name = "discord-py" },
     { name = "fastapi" },
@@ -4706,6 +4736,7 @@ model-server = [
 [package.metadata]
 requires-dist = [
     { name = "accelerate", marker = "extra == 'model-server'", specifier = "==1.6.0" },
+    { name = "agent-client-protocol", specifier = ">=0.7.1" },
     { name = "aioboto3", specifier = "==15.1.0" },
     { name = "aiohttp", marker = "extra == 'backend'", specifier = "==3.13.3" },
     { name = "alembic", marker = "extra == 'backend'", specifier = "==1.10.4" },
@@ -4722,6 +4753,7 @@ requires-dist = [
     { name = "celery-types", marker = "extra == 'dev'", specifier = "==0.19.0" },
     { name = "chardet", marker = "extra == 'backend'", specifier = "==5.2.0" },
     { name = "chonkie", marker = "extra == 'backend'", specifier = "==1.0.10" },
+    { name = "claude-agent-sdk", specifier = ">=0.1.19" },
     { name = "cohere", specifier = "==5.6.1" },
     { name = "dask", marker = "extra == 'backend'", specifier = "==2026.1.1" },
     { name = "ddtrace", marker = "extra == 'backend'", specifier = "==3.10.0" },
