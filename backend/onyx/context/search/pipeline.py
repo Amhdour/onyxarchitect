@@ -36,7 +36,7 @@ logger = setup_logger()
 @log_function_time(print_only=True)
 def _build_index_filters(
     user_provided_filters: BaseFilters | None,
-    user: User | None,  # Used for ACLs
+    user: User | None,  # Used for ACLs, None = bypass
     project_id: int | None,
     user_file_ids: list[UUID] | None,
     persona_document_sets: list[str] | None,
@@ -242,7 +242,7 @@ def search_pipeline(
     # Document index to search over
     # Note that federated sources will also be used (not related to this arg)
     document_index: DocumentIndex,
-    # Used for ACLs and federated search
+    # Used for ACLs and federated search, None = bypass ACL
     user: User | None,
     # Used for default filters and settings
     persona: Persona | None,

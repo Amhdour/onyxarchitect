@@ -331,7 +331,7 @@ class OpenURLTool(Tool[OpenURLToolOverrideKwargs]):
             tool_id: Unique identifier for this tool instance.
             emitter: Emitter for streaming packets to the client.
             document_index: Index handle for retrieving stored documents.
-            user: User context for ACL filtering.
+            user: User context for ACL filtering, None = bypass ACL.
             content_provider: Optional content provider. If not provided,
                 will use the default provider from the database or fall back
                 to the built-in Onyx web crawler.

@@ -64,7 +64,7 @@ def _get_federated_connector_instance(
 @router.post("")
 def create_federated_connector(
     federated_connector_data: FederatedConnectorRequest,
-    user: User | None = Depends(current_curator_or_admin_user),
+    user: User = Depends(current_curator_or_admin_user),
     db_session: Session = Depends(get_session),
 ) -> FederatedConnectorResponse:
     """Create a new federated connector"""
@@ -72,8 +72,8 @@ def create_federated_connector(
 
     if user is None:
         raise HTTPException(
-            status_code=400,
-            detail="Federated retrieval not supported with AUTH_TYPE=disabled.",
+            status_code=401,
+            detail="Authentication required for federated retrieval.",
         )
 
     logger.info(

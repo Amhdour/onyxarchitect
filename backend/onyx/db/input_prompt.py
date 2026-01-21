@@ -6,8 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import aliased
 from sqlalchemy.orm import Session
 
-from onyx.configs.app_configs import AUTH_TYPE
-from onyx.configs.constants import AuthType
+from onyx.configs.constants import ANONYMOUS_USER_UUID
 from onyx.db.models import InputPrompt
 from onyx.db.models import InputPrompt__User
 from onyx.db.models import User
@@ -28,16 +27,15 @@ def insert_input_prompt_if_not_exists(
     db_session: Session,
     commit: bool = True,
 ) -> InputPrompt:
+    user_id = user.id if user else None
+    is_anonymous = user is not None and str(user.id) == ANONYMOUS_USER_UUID
     if input_prompt_id is not None:
         input_prompt = (
             db_session.query(InputPrompt).filter_by(id=input_prompt_id).first()
         )
     else:
         query = db_session.query(InputPrompt).filter(InputPrompt.prompt == prompt)
-        if user:
-            query = query.filter(InputPrompt.user_id == user.id)
-        else:
-            query = query.filter(InputPrompt.user_id.is_(None))
+        query = query.filter(InputPrompt.user_id == user_id)
         input_prompt = query.first()
 
     if input_prompt is None:
@@ -46,8 +44,10 @@ def insert_input_prompt_if_not_exists(
             prompt=prompt,
             content=content,
             active=active,
-            is_public=is_public or user is None,
-            user_id=user.id if user else None,
+            is_public=is_public
+            or is_anonymous
+            or user is None,  # system prompts are public
+            user_id=user_id,
         )
         db_session.add(input_prompt)
 
@@ -61,15 +61,16 @@ def insert_input_prompt(
     prompt: str,
     content: str,
     is_public: bool,
-    user: User | None,
+    user: User,
     db_session: Session,
 ) -> InputPrompt:
+    is_anonymous = str(user.id) == ANONYMOUS_USER_UUID
     input_prompt = InputPrompt(
         prompt=prompt,
         content=content,
         active=True,
-        is_public=is_public,
-        user_id=user.id if user is not None else None,
+        is_public=is_public or is_anonymous,
+        user_id=user.id,
     )
     db_session.add(input_prompt)
     db_session.commit()
@@ -78,7 +79,7 @@ def insert_input_prompt(
 
 
 def update_input_prompt(
-    user: User | None,
+    user: User,
     input_prompt_id: int,
     prompt: str,
     content: str,
@@ -102,13 +103,12 @@ def update_input_prompt(
     return input_prompt
 
 
-def validate_user_prompt_authorization(
-    user: User | None, input_prompt: InputPrompt
-) -> bool:
+def validate_user_prompt_authorization(user: User, input_prompt: InputPrompt) -> bool:
     prompt = InputPromptSnapshot.from_model(input_prompt=input_prompt)
 
     if prompt.user_id is not None:
-        if user is None:
+        # Anonymous users cannot access user-owned prompts
+        if str(user.id) == ANONYMOUS_USER_UUID:
             return False
 
         user_details = UserInfo.from_model(user)
@@ -133,7 +133,7 @@ def remove_public_input_prompt(input_prompt_id: int, db_session: Session) -> Non
 
 
 def remove_input_prompt(
-    user: User | None,
+    user: User,
     input_prompt_id: int,
     db_session: Session,
     delete_public: bool = False,
@@ -193,7 +193,6 @@ def fetch_input_prompts_by_user(
     """
     Returns all prompts belonging to the user or public prompts,
     excluding those the user has specifically disabled.
-    Also, if `user_id` is None and AUTH_TYPE is DISABLED, then all prompts are returned.
     """
 
     query = select(InputPrompt)
@@ -223,15 +222,12 @@ def fetch_input_prompts_by_user(
             query = query.where(InputPrompt.user_id == user_id)
 
     else:
-        # user_id is None
-        if AUTH_TYPE == AuthType.DISABLED:
-            # If auth is disabled, return all prompts
-            query = query.where(True)  # type: ignore
-        elif include_public:
-            # Anonymous usage
+        # user_id is None - anonymous usage
+        if include_public:
             query = query.where(InputPrompt.is_public)
-
-        # Default to returning all prompts
+        else:
+            # No user and not requesting public prompts - return nothing
+            return []
 
     if active is not None:
         query = query.where(InputPrompt.active == active)

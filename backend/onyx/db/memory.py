@@ -1,12 +1,14 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from onyx.configs.constants import ANONYMOUS_USER_UUID
 from onyx.db.models import Memory
 from onyx.db.models import User
 
 
 def get_memories(user: User | None, db_session: Session) -> list[str]:
-    if user is None:
+    # Anonymous users and None users don't have memories
+    if not user or str(user.id) == ANONYMOUS_USER_UUID:
         return []
 
     user_info = [

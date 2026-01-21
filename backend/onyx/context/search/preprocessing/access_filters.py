@@ -10,7 +10,7 @@ def build_access_filters_for_user(user: User | None, session: Session) -> list[s
     return list(user_acl)
 
 
-def build_user_only_filters(user: User | None, db_session: Session) -> IndexFilters:
+def build_user_only_filters(user: User, db_session: Session) -> IndexFilters:
     user_acl_filters = build_access_filters_for_user(user, db_session)
     return IndexFilters(
         source_type=None,

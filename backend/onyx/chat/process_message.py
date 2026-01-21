@@ -37,6 +37,7 @@ from onyx.chat.prompt_utils import calculate_reserved_tokens
 from onyx.chat.save_chat import save_chat_turn
 from onyx.chat.stop_signal_checker import is_connected as check_stop_signal
 from onyx.chat.stop_signal_checker import reset_cancel_status
+from onyx.configs.constants import ANONYMOUS_USER_UUID
 from onyx.configs.constants import DEFAULT_PERSONA_ID
 from onyx.configs.constants import DocumentSource
 from onyx.configs.constants import MessageType
@@ -318,12 +319,14 @@ def handle_stream_message_objects(
     chat_session: ChatSession | None = None
     redis_client: Redis | None = None
 
-    user_id = user.id if user is not None else None
-    llm_user_identifier = (
-        user.email
-        if user is not None and getattr(user, "email", None)
-        else (str(user_id) if user_id else "anonymous_user")
-    )
+    user_id = user.id if user else None
+    is_anonymous = user is not None and str(user.id) == ANONYMOUS_USER_UUID
+    if user is None:
+        llm_user_identifier = "system"
+    elif is_anonymous:
+        llm_user_identifier = "anonymous_user"
+    else:
+        llm_user_identifier = user.email or str(user_id)
     try:
         if not new_msg_req.chat_session_id:
             if not new_msg_req.chat_session_info:

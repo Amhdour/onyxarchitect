@@ -145,7 +145,7 @@ export default function UserSettings() {
       visibleSections.push({ id: "password", label: "Password" });
     }
 
-    if (authType && authType !== AuthType.DISABLED) {
+    if (authType) {
       visibleSections.push({ id: "tokens", label: "Access Tokens" });
     }
 

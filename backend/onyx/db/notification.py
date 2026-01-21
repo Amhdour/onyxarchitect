@@ -69,9 +69,9 @@ def create_notification(
 
 
 def get_notification_by_id(
-    notification_id: int, user: User | None, db_session: Session
+    notification_id: int, user: User, db_session: Session
 ) -> Notification:
-    user_id = user.id if user else None
+    user_id = user.id
     notif = db_session.get(Notification, notification_id)
     if not notif:
         raise ValueError(f"No notification found with id {notification_id}")
@@ -85,14 +85,12 @@ def get_notification_by_id(
 
 
 def get_notifications(
-    user: User | None,
+    user: User,
     db_session: Session,
     notif_type: NotificationType | None = None,
     include_dismissed: bool = True,
 ) -> list[Notification]:
-    query = select(Notification).where(
-        Notification.user_id == user.id if user else Notification.user_id.is_(None)
-    )
+    query = select(Notification).where(Notification.user_id == user.id)
     if not include_dismissed:
         query = query.where(Notification.dismissed.is_(False))
     if notif_type:
