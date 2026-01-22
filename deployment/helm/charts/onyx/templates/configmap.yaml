@@ -7,7 +7,7 @@ metadata:
 data:
   INTERNAL_URL: "http://{{ include "onyx.fullname" . }}-api-service:{{ .Values.api.service.port | default 8080 }}"
   {{- if .Values.postgresql.enabled }}
-  POSTGRES_HOST: {{ .Release.Name }}-postgresql-rw
+  POSTGRES_HOST: {{ .Release.Name }}-{{ default "postgresql" .Values.postgresql.nameOverride }}-rw
   {{- end }}
   {{- if .Values.vespa.enabled }}
   VESPA_HOST: {{ .Values.vespa.name }}.{{ .Values.vespa.service.name }}.{{ .Release.Namespace }}.svc.cluster.local
@@ -19,7 +19,7 @@ data:
   ENABLE_OPENSEARCH_RETRIEVAL_FOR_ONYX: "false"
   {{- end }}
   {{- if .Values.redis.enabled }}
-  REDIS_HOST: {{ .Values.redis.redisStandalone.name | default .Release.Name }}-master
+  REDIS_HOST: {{ .Release.Name }}-redis
   {{- end }}
   MODEL_SERVER_HOST: "{{ include "onyx.fullname" . }}-inference-model-service"
   INDEXING_MODEL_SERVER_HOST: "{{ include "onyx.fullname" . }}-indexing-model-service"
