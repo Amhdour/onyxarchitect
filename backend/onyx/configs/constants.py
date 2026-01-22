@@ -203,6 +203,7 @@ class DocumentSource(str, Enum):
     R2 = "r2"
     GOOGLE_CLOUD_STORAGE = "google_cloud_storage"
     OCI_STORAGE = "oci_storage"
+    S3_COMPATIBLE = "s3_compatible"
     XENFORO = "xenforo"
     NOT_APPLICABLE = "not_applicable"
     DISCORD = "discord"
@@ -248,6 +249,7 @@ class BlobType(str, Enum):
     S3 = "s3"
     GOOGLE_CLOUD_STORAGE = "google_cloud_storage"
     OCI_STORAGE = "oci_storage"
+    S3_COMPATIBLE = "s3_compatible"
 
 
 class DocumentIndexType(str, Enum):
@@ -625,6 +627,7 @@ project management, and collaboration tools into a single, customizable platform
     DocumentSource.R2: "r2",
     DocumentSource.GOOGLE_CLOUD_STORAGE: "google_cloud_storage - cloud storage",
     DocumentSource.OCI_STORAGE: "oci_storage - cloud storage",
+    DocumentSource.S3_COMPATIBLE: "s3_compatible - generic S3-compatible storage",
     DocumentSource.XENFORO: "xenforo - forum data",
     DocumentSource.DISCORD: "discord - chat and collaboration",
     DocumentSource.FRESHDESK: "freshdesk - customer support data",
