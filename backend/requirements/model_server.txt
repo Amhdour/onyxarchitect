@@ -475,7 +475,7 @@ tqdm==4.67.1
     #   openai
     #   sentence-transformers
     #   transformers
-transformers==4.53.0
+transformers==4.57.5
     # via
     #   sentence-transformers
     #   setfit
