@@ -51,17 +51,6 @@ CitationMapping: TypeAlias = dict[int, SearchDoc]
 
 
 # ============================================================================
-# Utility functions
-# ============================================================================
-
-
-def in_code_block(llm_text: str) -> bool:
-    """Check if we're currently inside a code block by counting triple backticks."""
-    count = llm_text.count(TRIPLE_BACKTICK)
-    return count % 2 != 0
-
-
-# ============================================================================
 # Main Citation Processor with Dynamic Mapping
 # ============================================================================
 
@@ -178,6 +167,13 @@ class DynamicCitationProcessor:
         self.stop_stream = stop_stream
         self.citation_mode = citation_mode
 
+        # Code block tracking - count of triple backticks seen (odd = inside code block)
+        # This is tracked incrementally to avoid O(n) scans of the full output
+        self._code_block_count = 0
+        # Buffer for detecting triple backticks split across token boundaries
+        # Stores trailing backticks (max 2) from previous tokens
+        self._backtick_buffer = ""
+
         # Citation tracking
         self.cited_documents_in_order: list[SearchDoc] = (
             []
@@ -199,6 +195,37 @@ class DynamicCitationProcessor:
         self.citation_pattern = re.compile(
             r"([\[【［]{2}\d+[\]】］]{2})|([\[【［]\d+(?:, ?\d+)*[\]】］])"
         )
+
+    def _is_in_code_block(self) -> bool:
+        """Check if we're currently inside a code block.
+
+        Uses the incrementally tracked count of triple backticks.
+        Odd count means we're inside a code block.
+        """
+        return self._code_block_count % 2 != 0
+
+    def _update_code_block_count(self, text: str) -> None:
+        """Update the code block count based on triple backticks in the text.
+
+        This is called incrementally as tokens arrive to avoid O(n) scans.
+        Handles triple backticks that may be split across token boundaries
+        by maintaining a buffer of trailing backticks.
+        """
+        # Combine buffer with new text to detect backticks split across tokens
+        combined = self._backtick_buffer + text
+        self._code_block_count += combined.count(TRIPLE_BACKTICK)
+
+        # Update buffer: keep trailing backticks from combined
+        # These could form part of a triple backtick with the next token
+        trailing = 0
+        for char in reversed(combined):
+            if char == "`":
+                trailing += 1
+            else:
+                break
+        # Use modulo 3 because complete triples have already been counted
+        # e.g., "```" -> 0 trailing, "````" -> 1, "`````" -> 2
+        self._backtick_buffer = "`" * (trailing % 3)
 
     def update_citation_mapping(
         self,
@@ -294,6 +321,8 @@ class DynamicCitationProcessor:
 
         self.curr_segment += token
         self.llm_out += token
+        # Track code blocks incrementally to avoid O(n) scans
+        self._update_code_block_count(token)
 
         # Handle code blocks without language tags
         # If we see ``` followed by \n, add "plaintext" language specifier
@@ -304,7 +333,7 @@ class DynamicCitationProcessor:
                 parts = self.curr_segment.split("```")
                 if len(parts) > 1 and len(parts[1]) > 0:
                     piece_that_comes_after = parts[1][0]
-                    if piece_that_comes_after == "\n" and in_code_block(self.llm_out):
+                    if piece_that_comes_after == "\n" and self._is_in_code_block():
                         self.curr_segment = self.curr_segment.replace(
                             "```", "```plaintext"
                         )
@@ -316,7 +345,7 @@ class DynamicCitationProcessor:
         )
 
         result = ""
-        if citation_matches and not in_code_block(self.llm_out):
+        if citation_matches and not self._is_in_code_block():
             match_idx = 0
             for match in citation_matches:
                 match_span = match.span()
