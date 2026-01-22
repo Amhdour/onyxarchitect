@@ -22,6 +22,7 @@ from google.oauth2.service_account import Credentials as ServiceAccountCredentia
 from googleapiclient.errors import HttpError  # type: ignore
 from typing_extensions import override
 
+from onyx.access.models import ExternalAccess
 from onyx.configs.app_configs import GOOGLE_DRIVE_CONNECTOR_SIZE_THRESHOLD
 from onyx.configs.app_configs import INDEX_BATCH_SIZE
 from onyx.configs.app_configs import MAX_DRIVE_WORKERS
@@ -41,7 +42,9 @@ from onyx.connectors.google_drive.file_retrieval import get_all_files_for_oauth
 from onyx.connectors.google_drive.file_retrieval import (
     get_all_files_in_my_drive_and_shared,
 )
+from onyx.connectors.google_drive.file_retrieval import get_external_access_for_folder
 from onyx.connectors.google_drive.file_retrieval import get_files_in_shared_drive
+from onyx.connectors.google_drive.file_retrieval import get_folder_metadata
 from onyx.connectors.google_drive.file_retrieval import get_root_folder_id
 from onyx.connectors.google_drive.file_retrieval import has_link_only_permission
 from onyx.connectors.google_drive.models import DriveRetrievalStage
@@ -133,32 +136,19 @@ def _get_parent_id_from_file(drive_file: GoogleDriveFileType) -> str | None:
     return None
 
 
-def _get_folder_metadata(
-    service: GoogleDriveService,
-    folder_id: str,
-) -> GoogleDriveFileType | None:
-    """Fetch metadata for a folder by ID."""
-    try:
-        return (
-            service.files()
-            .get(
-                fileId=folder_id,
-                fields="id, name, parents, webViewLink, mimeType",
-                supportsAllDrives=True,
-            )
-            .execute()
-        )
-    except HttpError as e:
-        if e.resp.status in (403, 404):
-            logger.debug(f"Cannot access folder {folder_id}: {e}")
-            return None
-        raise
+def _public_access() -> ExternalAccess:
+    return ExternalAccess(
+        external_user_emails=set(),
+        external_user_group_ids=set(),
+        is_public=True,
+    )
 
 
 def _get_new_ancestors_for_files(
     service: GoogleDriveService,
     files: list[RetrievedDriveFile],
     seen_hierarchy_node_raw_ids: set[str],
+    permission_sync_context: PermissionSyncContext | None = None,
 ) -> list[HierarchyNode]:
     """
     Get all NEW ancestor hierarchy nodes for a batch of files.
@@ -171,10 +161,17 @@ def _get_new_ancestors_for_files(
         service: Google Drive service for fetching folder metadata
         files: List of retrieved drive files to get ancestors for
         seen_hierarchy_node_raw_ids: Set of already-yielded node IDs (modified in place)
+        permission_sync_context: If provided, permissions will be fetched for hierarchy nodes.
+            Contains google_domain and primary_admin_email needed for permission syncing.
 
     Returns:
         List of HierarchyNode objects for new ancestors (ordered parent-first)
     """
+    field_type = (
+        DriveFileFieldType.WITH_PERMISSIONS
+        if permission_sync_context
+        else DriveFileFieldType.STANDARD
+    )
     new_nodes: list[HierarchyNode] = []
 
     for file in files:
@@ -192,13 +189,21 @@ def _get_new_ancestors_for_files(
                 break
 
             # Fetch folder metadata
-            folder = _get_folder_metadata(service, current_id)
+            folder = get_folder_metadata(service, current_id, field_type)
             if not folder:
                 # Can't access this folder - stop climbing
                 break
 
             # Determine node type based on folder context
             folder_parent_id = _get_parent_id_from_file(folder)
+
+            # Extract permissions if context provided
+            if permission_sync_context:
+                external_access = get_external_access_for_folder(
+                    folder, permission_sync_context.google_domain, service
+                )
+            else:
+                external_access = _public_access()
 
             # Create hierarchy node for this folder
             node = HierarchyNode(
@@ -207,6 +212,7 @@ def _get_new_ancestors_for_files(
                 display_name=folder.get("name", "Unknown Folder"),
                 link=folder.get("webViewLink"),
                 node_type=HierarchyNodeType.FOLDER,
+                external_access=external_access,
             )
             ancestors_to_add.append(node)
             seen_hierarchy_node_raw_ids.add(current_id)
@@ -1300,20 +1306,23 @@ class GoogleDriveConnector(
             # Get drive service for hierarchy node fetching
             drive_service = get_drive_service(self.creds, self.primary_admin_email)
 
+            # Build permission sync context if needed
+            permission_sync_context = (
+                PermissionSyncContext(
+                    primary_admin_email=self.primary_admin_email,
+                    google_domain=self.google_domain,
+                )
+                if include_permissions
+                else None
+            )
+
             # Prepare a partial function with the credentials and admin email
             convert_func = partial(
                 convert_drive_item_to_document,
                 self.creds,
                 self.allow_images,
                 self.size_threshold,
-                (
-                    PermissionSyncContext(
-                        primary_admin_email=self.primary_admin_email,
-                        google_domain=self.google_domain,
-                    )
-                    if include_permissions
-                    else None
-                ),
+                permission_sync_context,
             )
             # Fetch files in batches
             batches_complete = 0
@@ -1329,6 +1338,7 @@ class GoogleDriveConnector(
                     service=drive_service,
                     files=files_batch,
                     seen_hierarchy_node_raw_ids=checkpoint.seen_hierarchy_node_raw_ids,
+                    permission_sync_context=permission_sync_context,
                 )
                 if new_ancestors:
                     logger.debug(
@@ -1484,10 +1494,15 @@ class GoogleDriveConnector(
             nonlocal files_batch, slim_batch
 
             # Get new ancestor hierarchy nodes first
+            permission_sync_context = PermissionSyncContext(
+                primary_admin_email=self.primary_admin_email,
+                google_domain=self.google_domain,
+            )
             new_ancestors = _get_new_ancestors_for_files(
                 service=drive_service,
                 files=files_batch,
                 seen_hierarchy_node_raw_ids=checkpoint.seen_hierarchy_node_raw_ids,
+                permission_sync_context=permission_sync_context,
             )
 
             # Build slim documents
