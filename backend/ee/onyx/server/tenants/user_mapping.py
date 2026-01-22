@@ -1,6 +1,8 @@
+from fastapi import HTTPException
 from fastapi_users import exceptions
 from sqlalchemy import select
 
+from ee.onyx.db.license import check_seat_availability
 from onyx.auth.invited_users import get_invited_users
 from onyx.auth.invited_users import get_pending_users
 from onyx.auth.invited_users import write_invited_users
@@ -71,7 +73,34 @@ def add_users_to_tenant(emails: list[str], tenant_id: str) -> None:
     Add users to a tenant with proper transaction handling.
     Checks if users already have a tenant mapping to avoid duplicates.
     If a user already has an active mapping to any tenant, the new mapping will be added as inactive.
+
+    Raises:
+        HTTPException: 402 if seat limit is reached.
     """
+    # Deduplicate emails to avoid double-counting
+    unique_emails = set(emails)
+
+    # First, count how many NEW users will be added (skip existing mappings)
+    with get_session_with_tenant(tenant_id=POSTGRES_DEFAULT_SCHEMA) as check_session:
+        new_user_count = 0
+        for email in unique_emails:
+            existing = (
+                check_session.query(UserTenantMapping)
+                .filter(
+                    UserTenantMapping.email == email,
+                    UserTenantMapping.tenant_id == tenant_id,
+                )
+                .first()
+            )
+            if not existing:
+                new_user_count += 1
+
+    # Check seat availability before proceeding
+    if new_user_count > 0:
+        available, error_msg = check_seat_availability(tenant_id, new_user_count)
+        if not available:
+            raise HTTPException(status_code=402, detail=error_msg)
+
     with get_session_with_tenant(tenant_id=POSTGRES_DEFAULT_SCHEMA) as db_session:
         try:
             # Start a transaction
@@ -165,7 +194,29 @@ def approve_user_invite(email: str, tenant_id: str) -> None:
     """
     Approve a user invite to a tenant.
     This will delete all existing records for this email and create a new mapping entry for the user in this tenant.
+
+    Raises:
+        HTTPException: 402 if seat limit is reached.
     """
+    # Check if user is already actively in this tenant (already counted in seats)
+    with get_session_with_shared_schema() as check_session:
+        existing_active = (
+            check_session.query(UserTenantMapping)
+            .filter(
+                UserTenantMapping.email == email,
+                UserTenantMapping.tenant_id == tenant_id,
+                UserTenantMapping.active == True,  # noqa: E712
+            )
+            .first()
+        )
+        is_new_to_tenant = existing_active is None
+
+    # If user is new to this tenant, check seat availability
+    if is_new_to_tenant:
+        available, error_msg = check_seat_availability(tenant_id, 1)
+        if not available:
+            raise HTTPException(status_code=402, detail=error_msg)
+
     with get_session_with_shared_schema() as db_session:
         # Delete all existing records for this email
         db_session.query(UserTenantMapping).filter(
@@ -195,7 +246,28 @@ def accept_user_invite(email: str, tenant_id: str) -> None:
     """
     Accept an invitation to join a tenant.
     This activates the user's mapping to the tenant.
+
+    Raises:
+        HTTPException: 402 if seat limit is reached.
     """
+    # Check if user is already active in this tenant (already counted)
+    with get_session_with_shared_schema() as check_session:
+        already_active_in_tenant = (
+            check_session.query(UserTenantMapping)
+            .filter(
+                UserTenantMapping.email == email,
+                UserTenantMapping.tenant_id == tenant_id,
+                UserTenantMapping.active == True,  # noqa: E712
+            )
+            .first()
+        )
+
+    # If user is not already active in this tenant, check seat availability
+    if not already_active_in_tenant:
+        available, error_msg = check_seat_availability(tenant_id, 1)
+        if not available:
+            raise HTTPException(status_code=402, detail=error_msg)
+
     with get_session_with_shared_schema() as db_session:
         try:
             # First check if there's an active mapping for this user and tenant
